@@ -23,7 +23,7 @@ const WorkOrderDetails = () => {
   const router = useRouter();
   const [workOrder, setWorkOrder] = useState<WorkOrder | null>(null);
   const [loading, setLoading] = useState(false);
-  const [setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [isLocationVisible, setIsLocationVisible] = useState(true);
   
   const [emergencies] = useState<Emergency[]>([]);
