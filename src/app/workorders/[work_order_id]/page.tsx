@@ -12,28 +12,25 @@ import {
   ExpandableSection,
 } from "@cloudscape-design/components";
 import UnifiedMap from '@/components/UnifiedMap';
-import {WorkOrder, LocationDetails} from '@/types/workorder';
+import {WorkOrder} from '@/types/workorder';
 import { Emergency } from '@/types/emergency';
 import { amplifyClient, getMessageCatigory } from "@/utils/amplify-utils"; // Ensure this is correctly configured
 import type { Schema } from '@/../amplify/data/resource';
 import { createChatSession } from "@/../amplify/functions/graphql/mutations";
 import ReactMarkdown from "react-markdown";
+
 const WorkOrderDetails = () => {
-  const searchParams = useSearchParams(); 
+  const searchParams = useSearchParams(); 
   const router = useRouter();
   const [workOrder, setWorkOrder] = useState<WorkOrder | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [setError] = useState<string | null>(null);
   const [isLocationVisible, setIsLocationVisible] = useState(true);
   
   const [emergencies, setEmergencies] = useState<Emergency[]>([]);
   const [loadingEmergencies, setLoadingEmergencies] = useState(false);
-  const [chatSessionId, setChatSessionId] = useState<string | null>(null);
   
-  const [safetyAgentResponse, setSafetyAgentResponse] = useState(""); // For real-time updates
-
   const [formattedResponse, setFormattedResponse] = useState<Chunk[]>([]); // Correctly typed state
-  const [messages, setMessages] = useState<Array<Schema["ChatMessage"]["createType"]>>([]);
 
   type Message = {
     id: string;
@@ -42,17 +39,17 @@ const WorkOrderDetails = () => {
     timestamp: Date;
     createdAt: string;  // Make this required since it's used for sorting
     chatSessionId?: string;  // Add this as it's likely part of your ChatMessage schema
-    previousTrendTableMessage?: any;
-    previousEventTableMessage?: any;
+    previousTrendTableMessage?: Record<string, unknown>;
+    previousEventTableMessage?: Record<string, unknown>;
     // Add any other properties that might be in your ChatMessage schema
     messageType?: string;  // For message categorization
-    metadata?: Record<string, any>;  // For additional data
+    metadata?: Record<string, unknown>;  // For additional data
   }
   
-
   // Use a ref to store the subscription object
-  const subscriptionRef = useRef<any>(null);
+  const subscriptionRef = useRef<{unsubscribe: () => void} | null>(null);
   const [isSubscriptionActive, setIsSubscriptionActive] = useState(false); // Track subscription status
+  
   useEffect(() => {
     const workOrderParam = searchParams.get('workOrder');
     if (workOrderParam) {
@@ -65,13 +62,11 @@ const WorkOrderDetails = () => {
     return <div>No details found for this Work Order.</div>;
   }
 
- 
   interface Chunk {
     index: number; // Index of the chunk
     content: string; // Content of the chunk
   }
   
-    
   const subscribeToUpdates = (chatSessionId: string) => {
     if (!chatSessionId) return;
   
@@ -160,58 +155,55 @@ const WorkOrderDetails = () => {
     };
   };
 
-const combineAndSortMessages = ((arr1: Array<Message>, arr2: Array<Message>) => {
-    const combinedMessages = [...arr1, ...arr2]
+  const combineAndSortMessages = ((arr1: Array<Message>, arr2: Array<Message>) => {
+    const combinedMessages = [...arr1, ...arr2];
     const uniqueMessages = combinedMessages.filter((message, index, self) =>
         index === self.findIndex((p) => p.id === message.id)
     );
     return uniqueMessages.sort((a, b) => {
-        if (!a.createdAt || !b.createdAt) throw new Error("createdAt is missing")
-        return a.createdAt.localeCompare(b.createdAt)
+        if (!a.createdAt || !b.createdAt) throw new Error("createdAt is missing");
+        return a.createdAt.localeCompare(b.createdAt);
     });
-})  
+  });
 
-const subscribeToChatUpdates = (chatSessionId: string) => {
-            const sub = amplifyClient.models.ChatMessage.observeQuery({
-                filter: {
-                    chatSessionId: { eq: chatSessionId }
-                }
-            }).subscribe({
-                next: ({ items }) => { //isSynced is an option here to
-                    setMessages((prevMessages) => {
-                        //If the message has type plot, attach the previous tool_table_events and tool_table_trend messages to it.
-                        const sortedMessages = combineAndSortMessages(prevMessages, items)
+  const subscribeToChatUpdates = (chatSessionId: string) => {
+    const sub = amplifyClient.models.ChatMessage.observeQuery({
+      filter: {
+        chatSessionId: { eq: chatSessionId }
+      }
+    }).subscribe({
+      next: ({ items }) => {
+        // Process messages if needed
+        const sortedMessages = combineAndSortMessages([], items);
+        
+        const sortedMessageWithPlotContext = sortedMessages.map((message, index) => {
+          const messageCatigory = getMessageCatigory(message);
+          if (messageCatigory === 'tool_plot') {
+            // Get the messages with a lower index than the tool_plot's index
+            const earlierMessages = sortedMessages.slice(0, index).reverse();
 
-                        const sortedMessageWithPlotContext = sortedMessages.map((message, index) => {
-                            const messageCatigory = getMessageCatigory(message)
-                            if (messageCatigory === 'tool_plot') {
-                                //Get the messages with a lower index than the tool_plot's index
-                                const earlierMessages = sortedMessages.slice(0, index).reverse()
+            const earlierEventsTable = earlierMessages.find((previousMessage) => {
+              const previousMessageCatigory = getMessageCatigory(previousMessage);
+              return previousMessageCatigory === 'tool_table_events';
+            });
 
-                                const earlierEventsTable = earlierMessages.find((previousMessage) => {
-                                    const previousMessageCatigory = getMessageCatigory(previousMessage)
-                                    return previousMessageCatigory === 'tool_table_events'
-                                })
+            const earlierTrendTable = earlierMessages.find((previousMessage) => {
+              const previousMessageCatigory = getMessageCatigory(previousMessage);
+              return previousMessageCatigory === 'tool_table_trend';
+            });
 
-                                const earlierTrendTable = earlierMessages.find((previousMessage) => {
-                                    const previousMessageCatigory = getMessageCatigory(previousMessage)
-                                    return previousMessageCatigory === 'tool_table_trend'
-                                })
-
-                                return {
-                                    ...message,
-                                    previousTrendTableMessage: earlierTrendTable,
-                                    previousEventTableMessage: earlierEventsTable
-                                }
-                            } else return message
-                        })
-                        console.log("@@@@@",sortedMessageWithPlotContext)
-                        return sortedMessageWithPlotContext
-                    })
-                }
-            }
-            )
-            return () => sub.unsubscribe();
+            return {
+              ...message,
+              previousTrendTableMessage: earlierTrendTable,
+              previousEventTableMessage: earlierEventsTable
+            };
+          } else return message;
+        });
+        console.log("@@@@@", sortedMessageWithPlotContext);
+        // We're not using setMessages anymore since it's unused
+      }
+    });
+    return () => sub.unsubscribe();
   };
 
   // Perform safety check and invoke Bedrock Agent
@@ -219,16 +211,15 @@ const subscribeToChatUpdates = (chatSessionId: string) => {
     try {
       setLoading(true);
       setError(null);
-      setSafetyAgentResponse(""); // Clear previous response
       setFormattedResponse([]); // Clear formatted response
+      
       // Create a sanitized version of the work order without the safety check fields
       const sanitizedWorkOrder = { ...workOrder };
       delete sanitizedWorkOrder.safetycheckresponse;
       delete sanitizedWorkOrder.safetyCheckPerformedAt;
-      //const prompt = `Perform weather, hazard, and emergency checks for WorkOrder ID ${workOrder?.work_order_id}.`;
-    // Create a prompt that includes the work order details
-    // Create a prompt that includes the work order details
-    const prompt = `Perform weather, hazard, and emergency checks for the following work order:
+      
+      // Create a prompt that includes the work order details
+      const prompt = `Perform weather, hazard, and emergency checks for the following work order:
                     ${JSON.stringify(sanitizedWorkOrder, null, 2)}
                     Please analyze potential safety risks, weather conditions, and any emergency situations that might affect this work order.`;
 
@@ -241,13 +232,12 @@ const subscribeToChatUpdates = (chatSessionId: string) => {
       const newChatSessionId = testChatSession.data.createChatSession.id;
       if (!newChatSessionId) throw new Error("Failed to create chat session");
 
-      setChatSessionId(newChatSessionId);
-
-     // Call the subscription function
-    subscribeToUpdates(newChatSessionId);      
-    subscribeToChatUpdates(newChatSessionId);
+      // Call the subscription functions
+      subscribeToUpdates(newChatSessionId);      
+      subscribeToChatUpdates(newChatSessionId);
+      
       // Fire-and-forget invocation of Bedrock Agent
-     await amplifyClient.queries
+      await amplifyClient.queries
         .invokeBedrockAgent({
           prompt,
           agentId: "OKXTFRR08S",
@@ -272,7 +262,7 @@ const subscribeToChatUpdates = (chatSessionId: string) => {
   const performEmergencyCheck = async () => {
     try {
       setLoadingEmergencies(true);
-            // Extract latitude and longitude
+      // Extract latitude and longitude
       const latitude = workOrder.location_details?.latitude;
       const longitude = workOrder.location_details?.longitude;
 
@@ -280,14 +270,13 @@ const subscribeToChatUpdates = (chatSessionId: string) => {
       if (latitude === undefined || longitude === undefined) {
         throw new Error('Work order location details are incomplete.');
       }
-      const queryObject = {
-          latitude: latitude,
-          longitude: longitude,
-        };
-
-      //const response = (await postEmergencyCheckRequest(queryObject) as unknown) as unknown;
-     // setEmergencies(response as Emergency[]);
-      //console.log(response);
+      
+      // This would be where you'd call your emergency check API
+      // For now, we're just logging the coordinates
+      console.log(`Checking emergencies at: ${latitude}, ${longitude}`);
+      
+      // Mock implementation - in a real app, you'd fetch actual emergency data
+      // setEmergencies(response as Emergency[]);
     } catch (err) {
       setError('Failed to initiate safety check');
     } finally {
@@ -297,7 +286,6 @@ const subscribeToChatUpdates = (chatSessionId: string) => {
 
   const lat = parseFloat(workOrder.location_details?.latitude || "0");
   const lng = parseFloat(workOrder.location_details?.longitude || "0");
-
 
   return (
     <SpaceBetween size="l">
@@ -363,81 +351,78 @@ const subscribeToChatUpdates = (chatSessionId: string) => {
           headerText={
             <SpaceBetween direction="horizontal" size="xs">
               <span>Location Details</span>
-          </SpaceBetween>
-        }
+            </SpaceBetween>
+          }
           expanded={isLocationVisible}
           onChange={({ detail }) => setIsLocationVisible(detail.expanded)}
         >
           <SpaceBetween size="l">
-          {isLocationVisible && (
-            <>
-            {workOrder.location_details?.latitude && workOrder.location_details?.longitude ? (
-              <UnifiedMap 
-              centerPoint={[
-                lng,
-                lat,
-              ]}
-              description={workOrder.location_name} 
-              emergencies={emergencies}
-                />
-              ) : (
-                "No location coordinates available."
-              )}
-            </>
-          )}
-          <Button
-                variant="primary"
-                loading={loadingEmergencies}
-                onClick={performEmergencyCheck}
-              >
-                Load Emergency Warnings
+            {isLocationVisible && (
+              <>
+                {workOrder.location_details?.latitude && workOrder.location_details?.longitude ? (
+                  <UnifiedMap 
+                    centerPoint={[lng, lat]}
+                    description={workOrder.location_name} 
+                    emergencies={emergencies}
+                  />
+                ) : (
+                  "No location coordinates available."
+                )}
+              </>
+            )}
+            <Button
+              variant="primary"
+              loading={loadingEmergencies}
+              onClick={performEmergencyCheck}
+            >
+              Load Emergency Warnings
             </Button>
           </SpaceBetween>
         </ExpandableSection>
       )}
 
-    <ExpandableSection headerText="Safety Agent Response" expanded={true}>
-    {isSubscriptionActive ? (
-        formattedResponse.length > 0 ? (
-        <div
-        className="messages"
-        role="region"
-        aria-label="Chat"
-        style={{
-            overflowY: 'auto', // Enable vertical scrolling
-            height: '100%',    // Take full height
-            padding: '16px',   // Add padding for better spacing
-            backgroundColor: '#f9f9f9', // Light background for better readability
-            borderRadius: '8px', // Rounded corners for a clean look
-            border: '1px solid #ddd', // Subtle border for separation
-            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
-        }}
-        >        
-         <div className="prose !max-w-none w-full" >
-            {formattedResponse.map((chunk) => (
-                <ReactMarkdown key={chunk.index}>{chunk.content}</ReactMarkdown>            
-            ))}
-        </div>
-        </div>
+      <ExpandableSection headerText="Safety Agent Response" expanded={true}>
+        {isSubscriptionActive ? (
+          formattedResponse.length > 0 ? (
+            <div
+              className="messages"
+              role="region"
+              aria-label="Chat"
+              style={{
+                overflowY: 'auto', // Enable vertical scrolling
+                height: '100%',    // Take full height
+                padding: '16px',   // Add padding for better spacing
+                backgroundColor: '#f9f9f9', // Light background for better readability
+                borderRadius: '8px', // Rounded corners for a clean look
+                border: '1px solid #ddd', // Subtle border for separation
+                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+              }}
+            >        
+              <div className="prose !max-w-none w-full">
+                {formattedResponse.map((chunk) => (
+                  <ReactMarkdown key={chunk.index}>{chunk.content}</ReactMarkdown>            
+                ))}
+              </div>
+            </div>
+          ) : (
+            <Box>Waiting for response...</Box>
+          )
+        ) : workOrder?.safetycheckresponse ? (
+          <div 
+            className="safety-check-response"
+            dangerouslySetInnerHTML={{ 
+              __html: workOrder.safetycheckresponse
+                .replace(/^"|"$/g, '') // Remove leading and trailing quotes
+                .replace(/\\n/g, '') // Remove \n characters
+                .replace(/\\u00b0C/g, '°C') // Replace \u00b0C with °C (escaped version)
+                .replace(/\u00b0C/g, '°C')
+            }} 
+          />
         ) : (
-        <Box>Waiting for response...</Box>
-        )
-    ) : workOrder?.safetycheckresponse ? (
-        <div className="safety-check-response"
-            dangerouslySetInnerHTML={{ __html:
-            workOrder.safetycheckresponse.replace(/^"|"$/g, '') // Remove leading and trailing quotes
-            .replace(/\\n/g, '') // Remove \n characters
-            .replace(/\\u00b0C/g, '°C') // Replace \u00b0C with °C (escaped version)
-            .replace(/\u00b0C/g, '°C')
-            }} />
-
-    ) : (
-        <Box>No safety check response available.</Box>
-    )}
-    </ExpandableSection>
-
-
-  </SpaceBetween>
+          <Box>No safety check response available.</Box>
+        )}
+      </ExpandableSection>
+    </SpaceBetween>
   );
 };
 
