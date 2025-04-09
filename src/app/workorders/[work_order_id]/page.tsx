@@ -10,6 +10,7 @@ import {
   StatusIndicator,
   Box,
   ExpandableSection,
+  Alert,
 } from "@cloudscape-design/components";
 import UnifiedMap from '@/components/UnifiedMap';
 import {WorkOrder} from '@/types/workorder';
@@ -17,7 +18,6 @@ import { Emergency } from '@/types/emergency';
 import { amplifyClient, getMessageCatigory } from "@/utils/amplify-utils"; // Ensure this is correctly configured
 import { createChatSession } from "@/../amplify/functions/graphql/mutations";
 import ReactMarkdown from "react-markdown";
-import ErrorAlert from '@/components/ErrorAlert';
 
 const WorkOrderDetails = () => {
   const searchParams = useSearchParams(); 
@@ -32,18 +32,42 @@ const WorkOrderDetails = () => {
   
   const [formattedResponse, setFormattedResponse] = useState<Chunk[]>([]); // Correctly typed state
 
-  type Message = {
+  // Define the ErrorAlert component inline
+  const ErrorAlert = ({ 
+    errorMessage, 
+    dismissible = false, 
+    onDismiss 
+  }: { 
+    errorMessage: string | null;
+    dismissible?: boolean;
+    onDismiss?: () => void;
+  }) => {
+    if (!errorMessage) return null;
+    
+    return (
+      <Alert
+        type="error"
+        dismissible={dismissible}
+        onDismiss={onDismiss}
+        header="Error"
+      >
+        {errorMessage}
+      </Alert>
+    );
+  };
+
+  // Define the Message type to match what's coming from the API
+  interface Message {
     id: string;
     content: string;
-    role: 'user' | 'assistant';
-    timestamp: Date;
-    createdAt: string;  // Make this required since it's used for sorting
-    chatSessionId?: string;  // Add this as it's likely part of your ChatMessage schema
-    previousTrendTableMessage?: Record<string, unknown>;
-    previousEventTableMessage?: Record<string, unknown>;
-    // Add any other properties that might be in your ChatMessage schema
-    messageType?: string;  // For message categorization
-    metadata?: Record<string, unknown>;  // For additional data
+    role: string;
+    createdAt: string;
+    chatSessionId?: string;
+    tool_calls?: string;
+    responseComplete?: boolean;
+    // Optional fields that might be added during processing
+    previousTrendTableMessage?: any;
+    previousEventTableMessage?: any;
   }
   
   // Use a ref to store the subscription object
@@ -155,16 +179,32 @@ const WorkOrderDetails = () => {
     };
   };
 
-  const combineAndSortMessages = ((arr1: Array<Message>, arr2: Array<Message>) => {
-    const combinedMessages = [...arr1, ...arr2];
+  // Helper function to combine and sort messages
+  const combineAndSortMessages = (arr1: Message[], arr2: any[]): Message[] => {
+    // Convert arr2 items to ensure they match the Message interface
+    const convertedArr2 = arr2.map(item => ({
+      id: item.id || '',
+      content: item.content || '',
+      role: item.role || '',
+      createdAt: item.createdAt || new Date().toISOString(),
+      chatSessionId: item.chatSessionId,
+      tool_calls: item.tool_calls,
+      responseComplete: item.responseComplete
+    }));
+    
+    const combinedMessages = [...arr1, ...convertedArr2];
     const uniqueMessages = combinedMessages.filter((message, index, self) =>
         index === self.findIndex((p) => p.id === message.id)
     );
+    
     return uniqueMessages.sort((a, b) => {
-        if (!a.createdAt || !b.createdAt) throw new Error("createdAt is missing");
+        if (!a.createdAt || !b.createdAt) {
+          console.error("Missing createdAt in message", { a, b });
+          return 0;
+        }
         return a.createdAt.localeCompare(b.createdAt);
     });
-  });
+  };
 
   const subscribeToChatUpdates = (chatSessionId: string) => {
     const sub = amplifyClient.models.ChatMessage.observeQuery({
@@ -174,35 +214,53 @@ const WorkOrderDetails = () => {
     }).subscribe({
       next: ({ items }) => {
         // Process messages if needed
-        const sortedMessages = combineAndSortMessages([], items);
-        
-        const sortedMessageWithPlotContext = sortedMessages.map((message, index) => {
-          const messageCatigory = getMessageCatigory(message);
-          if (messageCatigory === 'tool_plot') {
-            // Get the messages with a lower index than the tool_plot's index
-            const earlierMessages = sortedMessages.slice(0, index).reverse();
+        try {
+          const sortedMessages = combineAndSortMessages([], items);
+          
+          // Log the messages for debugging
+          console.log("Sorted messages:", sortedMessages);
+          
+          // Process the messages if needed
+          const sortedMessageWithPlotContext = sortedMessages.map((message, index) => {
+            try {
+              const messageCatigory = getMessageCatigory(message);
+              if (messageCatigory === 'tool_plot') {
+                // Get the messages with a lower index than the tool_plot's index
+                const earlierMessages = sortedMessages.slice(0, index).reverse();
 
-            const earlierEventsTable = earlierMessages.find((previousMessage) => {
-              const previousMessageCatigory = getMessageCatigory(previousMessage);
-              return previousMessageCatigory === 'tool_table_events';
-            });
+                const earlierEventsTable = earlierMessages.find((previousMessage) => {
+                  const previousMessageCatigory = getMessageCatigory(previousMessage);
+                  return previousMessageCatigory === 'tool_table_events';
+                });
 
-            const earlierTrendTable = earlierMessages.find((previousMessage) => {
-              const previousMessageCatigory = getMessageCatigory(previousMessage);
-              return previousMessageCatigory === 'tool_table_trend';
-            });
+                const earlierTrendTable = earlierMessages.find((previousMessage) => {
+                  const previousMessageCatigory = getMessageCatigory(previousMessage);
+                  return previousMessageCatigory === 'tool_table_trend';
+                });
 
-            return {
-              ...message,
-              previousTrendTableMessage: earlierTrendTable,
-              previousEventTableMessage: earlierEventsTable
-            };
-          } else return message;
-        });
-        console.log("@@@@@", sortedMessageWithPlotContext);
-        // We're not using setMessages anymore since it's unused
+                return {
+                  ...message,
+                  previousTrendTableMessage: earlierTrendTable,
+                  previousEventTableMessage: earlierEventsTable
+                };
+              } 
+              return message;
+            } catch (error) {
+              console.error("Error processing message:", error, message);
+              return message;
+            }
+          });
+          
+          console.log("Processed messages:", sortedMessageWithPlotContext);
+        } catch (error) {
+          console.error("Error in subscribeToChatUpdates:", error);
+        }
+      },
+      error: (error) => {
+        console.error("Error in chat subscription:", error);
       }
     });
+    
     return () => sub.unsubscribe();
   };
 
@@ -289,7 +347,6 @@ const WorkOrderDetails = () => {
   const lat = parseFloat(workOrder.location_details?.latitude || "0");
   const lng = parseFloat(workOrder.location_details?.longitude || "0");
 
-  // Error display component
   return (
     <SpaceBetween size="l">
       {/* Error Alert */}

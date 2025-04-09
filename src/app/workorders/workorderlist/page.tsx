@@ -2,7 +2,7 @@
 import { useRouter } from 'next/navigation';
 import React, { useEffect, useState } from "react";
 import { amplifyClient } from "@/utils/amplify-utils"; // Ensure this is correctly configured
-import { Container, Table, SpaceBetween, Box, StatusIndicator } from "@cloudscape-design/components";
+import { Container, Table, SpaceBetween, Box, StatusIndicator, Alert } from "@cloudscape-design/components";
 import "@aws-amplify/ui-react/styles.css";
 import { GraphQLResult } from "@aws-amplify/api-graphql";
 import { WorkOrder } from '@/types/workorder';
@@ -82,6 +82,18 @@ const WorkOrdersPage = () => {
 
   return (
     <Container>
+      {/* Error Alert */}
+      {error && (
+        <Alert
+          type="error"
+          dismissible
+          onDismiss={() => setError(null)}
+          header="Error"
+        >
+          {error}
+        </Alert>
+      )}
+      
       <Box
         fontSize="display-l"
         fontWeight="bold"
@@ -106,8 +118,6 @@ const WorkOrdersPage = () => {
       
       {loading ? (
         <div>Loading...</div>
-      ) : error ? (
-        <div style={{ color: "red" }}>{error}</div>
       ) : (
         <Table
           columnDefinitions={[
