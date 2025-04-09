@@ -66,8 +66,8 @@ const WorkOrderDetails = () => {
     tool_calls?: string;
     responseComplete?: boolean;
     // Optional fields that might be added during processing
-    previousTrendTableMessage?: any;
-    previousEventTableMessage?: any;
+    previousTrendTableMessage?: Record<string, unknown>;
+    previousEventTableMessage?: Record<string, unknown>;
   }
   
   // Use a ref to store the subscription object
@@ -180,7 +180,7 @@ const WorkOrderDetails = () => {
   };
 
   // Helper function to combine and sort messages
-  const combineAndSortMessages = (arr1: Message[], arr2: any[]): Message[] => {
+  const combineAndSortMessages = (arr1: Message[], arr2: Record<string, unknown>[]): Message[] => {
     // Convert arr2 items to ensure they match the Message interface
     const convertedArr2 = arr2.map(item => ({
       id: item.id || '',
