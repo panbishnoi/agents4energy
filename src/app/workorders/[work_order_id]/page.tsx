@@ -15,7 +15,6 @@ import UnifiedMap from '@/components/UnifiedMap';
 import {WorkOrder} from '@/types/workorder';
 import { Emergency } from '@/types/emergency';
 import { amplifyClient, getMessageCatigory } from "@/utils/amplify-utils"; // Ensure this is correctly configured
-import type { Schema } from '@/../amplify/data/resource';
 import { createChatSession } from "@/../amplify/functions/graphql/mutations";
 import ReactMarkdown from "react-markdown";
 
@@ -27,7 +26,7 @@ const WorkOrderDetails = () => {
   const [setError] = useState<string | null>(null);
   const [isLocationVisible, setIsLocationVisible] = useState(true);
   
-  const [emergencies, setEmergencies] = useState<Emergency[]>([]);
+  const [emergencies] = useState<Emergency[]>([]);
   const [loadingEmergencies, setLoadingEmergencies] = useState(false);
   
   const [formattedResponse, setFormattedResponse] = useState<Chunk[]>([]); // Correctly typed state
@@ -123,8 +122,8 @@ const WorkOrderDetails = () => {
             return newStream.sort((a, b) => a.index - b.index);
           });
         },
-        error: (err) => {
-          console.error("Error in subscription:", err);
+        error: (error) => {
+          console.error("Error in subscription:", error);
           setError("Failed to receive real-time updates.");
           setIsSubscriptionActive(false);
         },
@@ -247,12 +246,12 @@ const WorkOrderDetails = () => {
         .then(() => {
           console.log("Safety check initiated successfully.");
         })
-        .catch((err) => {
-          console.error("Error invoking Bedrock Agent:", err);
+        .catch((error) => {
+          console.error("Error invoking Bedrock Agent:", error);
           setError("Failed to invoke Bedrock Agent.");
         });
-    } catch (err) {
-      console.error("Error performing safety check:", err);
+    } catch (error) {
+      console.error("Error performing safety check:", error);
       setError("Failed to initiate safety check.");
     } finally {
       setLoading(false);
@@ -276,9 +275,11 @@ const WorkOrderDetails = () => {
       console.log(`Checking emergencies at: ${latitude}, ${longitude}`);
       
       // Mock implementation - in a real app, you'd fetch actual emergency data
-      // setEmergencies(response as Emergency[]);
-    } catch (err) {
-      setError('Failed to initiate safety check');
+      // const response = await fetchEmergencyData(latitude, longitude);
+      // setEmergencies(response);
+    } catch (error) {
+      console.error("Error checking emergencies:", error);
+      setError('Failed to initiate emergency check');
     } finally {
       setLoadingEmergencies(false);
     }
