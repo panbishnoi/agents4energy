@@ -9,7 +9,7 @@ import {
   invokeBedrockAgentFunction,
   getStructuredOutputFromLangchainFunction,
   productionAgentFunction,
-  planAndExecuteAgentFunction,
+  planAndExecuteAgentFunction,workOrderFunction
 } from './data/resource';
 import { preSignUp } from './functions/preSignUp/resource';
 import { storage } from './storage/resource';
@@ -50,7 +50,7 @@ const backend = defineBackend({
   getStructuredOutputFromLangchainFunction,
   productionAgentFunction,
   planAndExecuteAgentFunction,
-  preSignUp
+  preSignUp,workOrderFunction
 });
 
 const bedrockRuntimeDataSource = backend.data.resources.graphqlApi.addHttpDataSource(
@@ -126,6 +126,23 @@ backend.getStructuredOutputFromLangchainFunction.resources.lambda.addToRolePolic
     actions: ["bedrock:InvokeModel"],
   })
 )
+
+backend.workOrderFunction.resources.lambda.addToRolePolicy(
+  new iam.PolicyStatement({
+    resources: [
+      `*`
+    ],
+    actions: [
+      "dynamodb:GetItem",
+      "dynamodb:Scan",
+      "dynamodb:Query",
+      "dynamodb:PutItem",
+      "dynamodb:UpdateItem",
+      "dynamodb:DeleteItem"
+    ],
+  })
+);
+
 
 const networkingStack = backend.createStack('networkingStack')
 const rootStack = cdk.Stack.of(networkingStack).nestedStackParent

@@ -50,6 +50,17 @@ export const planAndExecuteAgentFunction = defineFunction({
   runtime: 20
 });
 
+export const workOrderFunction = defineFunction({
+  name: "workorder-function",
+  entry: '../functions/workordersafety/workorders.ts',
+  timeoutSeconds: 900,
+  environment: {
+    WorkOrderTableName: 'fieldworkforce-safety-app-work-orders',
+    LocationTableName: 'fieldworkforce-safety-app-locations',
+  },
+  runtime: 20
+});
+
 // export const addIamDirectiveFunction = defineFunction({
 //   name: "add-iam-directive-function",
 //   entry: '../functions/addIamDirectiveToAllAssets.ts',
@@ -202,6 +213,38 @@ const schema = a.schema({
     .handler(a.handler.custom({ entry: './receiveMessageStreamChunk.js' }))
     .authorization(allow => [allow.authenticated()]),
 
+
+WorkOrder: a.model({
+    work_order_id: a.string().required(),
+    asset_id: a.string().required(),
+    description: a.string(),
+    location_name: a.string(),
+    owner_name: a.string(),
+    priority: a.integer(),
+    safetyCheckPerformedAt: a.string(),
+    safetycheckresponse: a.string(),
+    scheduled_finish_timestamp: a.string(),
+    scheduled_start_timestamp: a.string(),
+    status: a.string(),
+    location_details: a.customType({
+      location_name: a.string(),
+      address: a.string(),
+      description: a.string(),
+      latitude: a.string(),
+      longitude: a.string(),
+    }),
+  })
+  .identifier(['work_order_id'])
+  .authorization((allow) => [allow.owner(), allow.authenticated()]),
+    
+  fetchWorkOrders: a
+    .query()
+    .returns(a.ref("WorkOrder").array())
+    .authorization((allow) => allow.authenticated())
+    .handler(
+      a.handler.function(workOrderFunction)
+    )
+    
 }).authorization(allow => [
   allow.resource(getStructuredOutputFromLangchainFunction),
   allow.resource(productionAgentFunction),
