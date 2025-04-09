@@ -10,6 +10,7 @@ import {
   StatusIndicator,
   Box,
   ExpandableSection,
+  Alert,
 } from "@cloudscape-design/components";
 import UnifiedMap from '@/components/UnifiedMap';
 import {WorkOrder} from '@/types/workorder';
@@ -17,6 +18,7 @@ import { Emergency } from '@/types/emergency';
 import { amplifyClient, getMessageCatigory } from "@/utils/amplify-utils"; // Ensure this is correctly configured
 import { createChatSession } from "@/../amplify/functions/graphql/mutations";
 import ReactMarkdown from "react-markdown";
+import ErrorAlert from '@/components/ErrorAlert';
 
 const WorkOrderDetails = () => {
   const searchParams = useSearchParams(); 
@@ -288,8 +290,12 @@ const WorkOrderDetails = () => {
   const lat = parseFloat(workOrder.location_details?.latitude || "0");
   const lng = parseFloat(workOrder.location_details?.longitude || "0");
 
+  // Error display component
   return (
     <SpaceBetween size="l">
+      {/* Error Alert */}
+      {error && <ErrorAlert errorMessage={error} dismissible onDismiss={() => setError(null)} />}
+      
       {/* Back Button */}
       <Button onClick={() => router.push('/workorders')} variant="link">← Back to List</Button>
 
