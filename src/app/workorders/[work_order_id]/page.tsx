@@ -10,7 +10,6 @@ import {
   StatusIndicator,
   Box,
   ExpandableSection,
-  Alert,
 } from "@cloudscape-design/components";
 import UnifiedMap from '@/components/UnifiedMap';
 import {WorkOrder} from '@/types/workorder';
