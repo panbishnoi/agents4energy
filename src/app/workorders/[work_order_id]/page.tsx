@@ -20,17 +20,7 @@ import { Emergency } from '@/types/emergency';
 import { amplifyClient, getMessageCatigory } from "@/utils/amplify-utils"; // Ensure this is correctly configured
 import { createChatSession } from "@/../amplify/functions/graphql/mutations";
 import ReactMarkdown from "react-markdown";
-
-// Define Message type explicitly here since we can't find the original definition
-interface Message {
-  id: string;
-  content: string;
-  role: string;
-  createdAt: string;
-  chatSessionId?: unknown;
-  tool_calls?: unknown;
-  responseComplete?: unknown;
-}
+import { Message } from '@/utils/types'; // Import the correct Message type
 
 // Define Chunk type for formatted responses
 interface Chunk {
@@ -256,16 +246,22 @@ const WorkOrderDetails = () => {
 
   // Helper function to combine and sort messages
   const combineAndSortMessages = (arr1: Message[], arr2: Record<string, unknown>[]): Message[] => {
-    // Convert arr2 items to ensure they match the Message interface
-    const convertedArr2 = arr2.map(item => ({
-      id: String(item.id || ''),
-      content: String(item.content || ''),
-      role: String(item.role || ''),
-      createdAt: String(item.createdAt || new Date().toISOString()),
-      chatSessionId: item.chatSessionId,
-      tool_calls: item.tool_calls,
-      responseComplete: item.responseComplete
-    } as Message)); // Explicitly cast to Message type
+    // Convert arr2 items to ensure they match the Message interface from utils/types
+    const convertedArr2 = arr2.map(item => {
+      // Create a properly typed Message object
+      const message: Message = {
+        id: String(item.id || ''),
+        content: String(item.content || ''),
+        role: (item.role as string === 'human' || item.role as string === 'ai' || item.role as string === 'tool') 
+          ? (item.role as "human" | "ai" | "tool") 
+          : "ai", // Default to 'ai' if not a valid role
+        createdAt: String(item.createdAt || new Date().toISOString()),
+        chatSessionId: item.chatSessionId as string,
+        tool_calls: item.tool_calls as string,
+        responseComplete: item.responseComplete as boolean
+      };
+      return message;
+    });
     
     const combinedMessages = [...arr1, ...convertedArr2];
     const uniqueMessages = combinedMessages.filter((message, index, self) =>
