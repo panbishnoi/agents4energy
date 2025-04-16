@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/ban-ts-comment */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -87,9 +89,9 @@ const WorkOrderDetails = () => {
     
     // Reset Leaflet's internal ID counter to prevent "already initialized" errors
     if (typeof window !== 'undefined' && window.L) {
-      // @ts-ignore - Leaflet stores this internally
+      // @ts-expect-error - Leaflet stores this internally
       if (window.L._leaflet_id) {
-        // @ts-ignore
+        // @ts-expect-error - Accessing Leaflet's internal property
         window.L._leaflet_id = 0;
       }
     }
@@ -116,9 +118,9 @@ const WorkOrderDetails = () => {
       // Clean up Leaflet map instances
       if (typeof window !== 'undefined') {
         // Reset Leaflet's internal counter
-        // @ts-ignore
+        // @ts-expect-error - Accessing Leaflet's internal property
         if (window.L && window.L._leaflet_id) {
-          // @ts-ignore
+          // @ts-expect-error - Accessing Leaflet's internal property
           window.L._leaflet_id = 0;
         }
         
@@ -126,11 +128,11 @@ const WorkOrderDetails = () => {
         const leafletContainers = document.querySelectorAll('.leaflet-container');
         leafletContainers.forEach(container => {
           // Try to access the map instance and remove it
-          // @ts-ignore
+          // @ts-expect-error - Accessing Leaflet's internal property
           if (container._leaflet_id) {
-            // @ts-ignore
+            // @ts-expect-error - Accessing Leaflet's internal property
             container._leaflet = null;
-            // @ts-ignore
+            // @ts-expect-error - Accessing Leaflet's internal property
             container._leaflet_id = null;
           }
         });
@@ -458,7 +460,7 @@ const WorkOrderDetails = () => {
       console.log(`Checking emergencies at: ${latitude}, ${longitude}`);
       
       // Create a prompt that includes the location details
-      const emergencyPrompt = `Check for emergencies near latitude ${latitude}, longitude ${longitude}. 
+      const emergencyPromptText = `Check for emergencies near latitude ${latitude}, longitude ${longitude}. 
                     This is for work order ${workOrder.work_order_id} at ${workOrder.location_name}.
                     Please provide information about any emergency situations within 50 miles of this location.`;
       
@@ -482,9 +484,21 @@ const WorkOrderDetails = () => {
         }, 500);
       }
       
-      // Mock implementation - in a real app, you'd fetch actual emergency data
-      // const response = await fetchEmergencyData(latitude, longitude);
-      // setEmergencies(response);
+      // Invoke Bedrock Agent with the emergency prompt
+      await amplifyClient.queries
+        .invokeBedrockAgent({
+          prompt: emergencyPromptText,
+          agentId: "OKXTFRR08S",
+          agentAliasId: "KZENI6GIPM",
+          chatSessionId: emergencyChatSessionId,
+        })
+        .then(() => {
+          console.log("Emergency check initiated successfully.");
+        })
+        .catch((error) => {
+          console.error("Error invoking Bedrock Agent:", error);
+          setError('Failed to initiate emergency check');
+        });
     } catch (error) {
       console.error("Error checking emergencies:", error);
       setError('Failed to initiate emergency check');
@@ -578,17 +592,17 @@ const WorkOrderDetails = () => {
             
             // If we're expanding, first clean up any existing map instances
             if (typeof window !== 'undefined' && window.L) {
-              // @ts-ignore - Leaflet stores this internally
+              // @ts-expect-error - Leaflet stores this internally
               window.L._leaflet_id = 0;
               
               // Clean up any existing map containers
               const mapContainers = document.querySelectorAll('.leaflet-container');
               mapContainers.forEach(container => {
-                // @ts-ignore - Accessing Leaflet's internal property
+                // @ts-expect-error - Accessing Leaflet's internal property
                 if (container._leaflet_id) {
-                  // @ts-ignore
+                  // @ts-expect-error - Accessing Leaflet's internal property
                   container._leaflet = null;
-                  // @ts-ignore
+                  // @ts-expect-error - Accessing Leaflet's internal property
                   container._leaflet_id = null;
                 }
               });

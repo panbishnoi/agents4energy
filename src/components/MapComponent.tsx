@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/ban-ts-comment */
+/* eslint-disable react-hooks/exhaustive-deps */
 "use client";
 // IMPORTANT: the order matters!
 import "leaflet/dist/leaflet.css";
