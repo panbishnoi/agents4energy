@@ -334,17 +334,17 @@ const WorkOrderDetails = () => {
       
       // Reset Leaflet's internal ID counter before performing safety check
       if (typeof window !== 'undefined' && window.L) {
-        // @ts-ignore - Leaflet stores this internally
+        // @ts-expect-error - Leaflet stores this internally
         window.L._leaflet_id = 0;
         
         // Clean up any existing map containers
         const mapContainers = document.querySelectorAll('.leaflet-container');
         mapContainers.forEach(container => {
-          // @ts-ignore - Accessing Leaflet's internal property
+          // @ts-expect-error - Accessing Leaflet's internal property
           if (container._leaflet_id) {
-            // @ts-ignore
+            // @ts-expect-error - Accessing Leaflet's internal property
             container._leaflet = null;
-            // @ts-ignore
+            // @ts-expect-error - Accessing Leaflet's internal property
             container._leaflet_id = null;
           }
         });
@@ -363,7 +363,7 @@ const WorkOrderDetails = () => {
       delete sanitizedWorkOrder.safetyCheckPerformedAt;
       
       // Create a prompt that includes the work order details
-      const prompt = `Perform weather, hazard, and emergency checks for the following work order:
+      const safetyPrompt = `Perform weather, hazard, and emergency checks for the following work order:
                     ${JSON.stringify(sanitizedWorkOrder, null, 2)}
                     Please analyze potential safety risks, weather conditions, and any emergency situations that might affect this work order.`;
 
@@ -391,7 +391,7 @@ const WorkOrderDetails = () => {
       // Fire-and-forget invocation of Bedrock Agent
       await amplifyClient.queries
         .invokeBedrockAgent({
-          prompt,
+          prompt: safetyPrompt,
           agentId: "OKXTFRR08S",
           agentAliasId: "KZENI6GIPM",
           chatSessionId: newChatSessionId,
@@ -424,17 +424,17 @@ const WorkOrderDetails = () => {
       
       // Reset Leaflet's internal ID counter before performing emergency check
       if (typeof window !== 'undefined' && window.L) {
-        // @ts-ignore - Leaflet stores this internally
+        // @ts-expect-error - Leaflet stores this internally
         window.L._leaflet_id = 0;
         
         // Clean up any existing map containers
         const mapContainers = document.querySelectorAll('.leaflet-container');
         mapContainers.forEach(container => {
-          // @ts-ignore - Accessing Leaflet's internal property
+          // @ts-expect-error - Accessing Leaflet's internal property
           if (container._leaflet_id) {
-            // @ts-ignore
+            // @ts-expect-error - Accessing Leaflet's internal property
             container._leaflet = null;
-            // @ts-ignore
+            // @ts-expect-error - Accessing Leaflet's internal property
             container._leaflet_id = null;
           }
         });
@@ -458,7 +458,7 @@ const WorkOrderDetails = () => {
       console.log(`Checking emergencies at: ${latitude}, ${longitude}`);
       
       // Create a prompt that includes the location details
-      const prompt = `Check for emergencies near latitude ${latitude}, longitude ${longitude}. 
+      const emergencyPrompt = `Check for emergencies near latitude ${latitude}, longitude ${longitude}. 
                     This is for work order ${workOrder.work_order_id} at ${workOrder.location_name}.
                     Please provide information about any emergency situations within 50 miles of this location.`;
       

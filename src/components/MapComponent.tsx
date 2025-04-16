@@ -29,7 +29,7 @@ L.Marker.prototype.options.icon = defaultIcon;
 
 // Reset Leaflet's global ID counter - this is crucial
 if (typeof window !== 'undefined' && window.L) {
-  // @ts-ignore - Accessing Leaflet's internal property
+  // @ts-expect-error - Accessing Leaflet's internal property
   window.L._leaflet_id = 0;
 }
 
@@ -63,7 +63,7 @@ const MapComponent = ({ centerPoint, description, emergencies }: UnifiedMapProps
     // Reset Leaflet's ID counter on mount
     useEffect(() => {
       if (typeof window !== 'undefined' && window.L) {
-        // @ts-ignore - Accessing Leaflet's internal property
+        // @ts-expect-error - Accessing Leaflet's internal property
         window.L._leaflet_id = 0;
       }
       
@@ -76,11 +76,11 @@ const MapComponent = ({ centerPoint, description, emergencies }: UnifiedMapProps
         if (typeof window !== 'undefined') {
           const mapContainers = document.querySelectorAll('.leaflet-container');
           mapContainers.forEach(container => {
-            // @ts-ignore - Accessing Leaflet's internal property
+            // @ts-expect-error - Accessing Leaflet's internal property
             if (container._leaflet_id) {
-              // @ts-ignore
+              // @ts-expect-error - Accessing Leaflet's internal property
               container._leaflet = null;
-              // @ts-ignore
+              // @ts-expect-error - Accessing Leaflet's internal property
               container._leaflet_id = null;
             }
           });
@@ -89,7 +89,6 @@ const MapComponent = ({ centerPoint, description, emergencies }: UnifiedMapProps
     }, [centerPoint]); // Re-run when centerPoint changes
     
     // We should always render the map - removing this check that was preventing rendering
-    // The useEffect above sets isMountedRef.current = true, but this check was running before that effect
     
     return (
         <MapContainer 

@@ -25,23 +25,23 @@ const UnifiedMap = (props: UnifiedMapProps) => {
   const instanceKey = useMemo(() => {
     mapInstanceCounter += 1;
     return `map-instance-${Date.now()}-${mapInstanceCounter}-${Math.random().toString(36).substring(2, 9)}`;
-  }, [props.centerPoint]); // Re-generate key when centerPoint changes
+  }, []); // No dependencies needed here
 
   useEffect(() => {
     // Reset Leaflet's internal state before mounting
     if (typeof window !== 'undefined' && window.L) {
       // Reset Leaflet's internal counter to prevent ID conflicts
-      // @ts-ignore - Accessing Leaflet's internal property
+      // @ts-expect-error - Accessing Leaflet's internal property
       window.L._leaflet_id = 0;
       
       // Clean up any existing map containers
       const mapContainers = document.querySelectorAll('.leaflet-container');
       mapContainers.forEach(container => {
-        // @ts-ignore - Accessing Leaflet's internal property
+        // @ts-expect-error - Accessing Leaflet's internal property
         if (container._leaflet_id) {
-          // @ts-ignore
+          // @ts-expect-error - Accessing Leaflet's internal property
           container._leaflet = null;
-          // @ts-ignore
+          // @ts-expect-error - Accessing Leaflet's internal property
           container._leaflet_id = null;
         }
       });
@@ -59,9 +59,9 @@ const UnifiedMap = (props: UnifiedMapProps) => {
       // Clean up any Leaflet map instances on unmount
       if (typeof window !== 'undefined') {
         // Reset Leaflet's internal counter
-        // @ts-ignore - Accessing Leaflet's internal property
+        // @ts-expect-error - Accessing Leaflet's internal property
         if (window.L) {
-          // @ts-ignore
+          // @ts-expect-error - Accessing Leaflet's internal property
           window.L._leaflet_id = 0;
         }
         
@@ -69,17 +69,17 @@ const UnifiedMap = (props: UnifiedMapProps) => {
         const leafletContainers = document.querySelectorAll('.leaflet-container');
         leafletContainers.forEach(container => {
           // Try to access the map instance and remove it
-          // @ts-ignore - Accessing Leaflet's internal property
+          // @ts-expect-error - Accessing Leaflet's internal property
           if (container._leaflet_id) {
-            // @ts-ignore
+            // @ts-expect-error - Accessing Leaflet's internal property
             container._leaflet = null;
-            // @ts-ignore
+            // @ts-expect-error - Accessing Leaflet's internal property
             container._leaflet_id = null;
           }
         });
       }
     };
-  }, [props.centerPoint]); // Re-run when centerPoint changes
+  }, []); // Only run on mount/unmount
 
   if (!isMounted) {
     return <div style={{ height: '500px', width: '100%', background: '#f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Preparing map...</div>;
