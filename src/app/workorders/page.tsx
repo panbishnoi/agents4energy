@@ -1,9 +1,12 @@
 "use client"
 
 import Page from './workorderlist/page'
+import { withAuth } from '@/components/WithAuth'
 
-export default function Home() {
+function Home() {
   return (
     <Page />
   )
 }
+
+export default withAuth(Home)

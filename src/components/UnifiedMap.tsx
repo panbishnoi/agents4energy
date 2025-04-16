@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 
 // Import the UnifiedMapProps type
@@ -15,16 +15,78 @@ const MapComponent = dynamic(
   }
 );
 
+// Create a global counter to ensure each map instance has a unique ID
+let mapInstanceCounter = 0;
+
 const UnifiedMap = (props: UnifiedMapProps) => {
   const [isMounted, setIsMounted] = useState(false);
+  
+  // Generate a truly unique key for each instance that won't change on re-renders
+  const instanceKey = useMemo(() => {
+    mapInstanceCounter += 1;
+    return `map-instance-${Date.now()}-${mapInstanceCounter}-${Math.random().toString(36).substring(2, 9)}`;
+  }, [props.centerPoint]); // Re-generate key when centerPoint changes
 
   useEffect(() => {
-    setIsMounted(true);
-  }, []);
+    // Reset Leaflet's internal state before mounting
+    if (typeof window !== 'undefined' && window.L) {
+      // Reset Leaflet's internal counter to prevent ID conflicts
+      // @ts-ignore - Accessing Leaflet's internal property
+      window.L._leaflet_id = 0;
+      
+      // Clean up any existing map containers
+      const mapContainers = document.querySelectorAll('.leaflet-container');
+      mapContainers.forEach(container => {
+        // @ts-ignore - Accessing Leaflet's internal property
+        if (container._leaflet_id) {
+          // @ts-ignore
+          container._leaflet = null;
+          // @ts-ignore
+          container._leaflet_id = null;
+        }
+      });
+    }
+    
+    // Small delay to ensure DOM is ready
+    const timer = setTimeout(() => {
+      setIsMounted(true);
+    }, 100);
+    
+    return () => {
+      clearTimeout(timer);
+      setIsMounted(false);
+      
+      // Clean up any Leaflet map instances on unmount
+      if (typeof window !== 'undefined') {
+        // Reset Leaflet's internal counter
+        // @ts-ignore - Accessing Leaflet's internal property
+        if (window.L) {
+          // @ts-ignore
+          window.L._leaflet_id = 0;
+        }
+        
+        // Remove any map instances that might be stored
+        const leafletContainers = document.querySelectorAll('.leaflet-container');
+        leafletContainers.forEach(container => {
+          // Try to access the map instance and remove it
+          // @ts-ignore - Accessing Leaflet's internal property
+          if (container._leaflet_id) {
+            // @ts-ignore
+            container._leaflet = null;
+            // @ts-ignore
+            container._leaflet_id = null;
+          }
+        });
+      }
+    };
+  }, [props.centerPoint]); // Re-run when centerPoint changes
 
-  if (!isMounted) return null;
+  if (!isMounted) {
+    return <div style={{ height: '500px', width: '100%', background: '#f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Preparing map...</div>;
+  }
 
-  return <MapComponent {...props} />;
+  // Use the key to force a complete remount of the component
+  return <MapComponent key={instanceKey} {...props} />;
 };
 
 export default UnifiedMap;

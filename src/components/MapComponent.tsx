@@ -10,8 +10,9 @@ import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
 
 import { UnifiedMapProps } from '@/types/emergency';
-import { useEffect } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import L, {LatLngTuple} from 'leaflet';
+
 // Set up default icon
 const defaultIcon = L.icon({
   iconUrl: markerIcon.src,
@@ -26,28 +27,90 @@ const defaultIcon = L.icon({
 // Set the default icon for all markers
 L.Marker.prototype.options.icon = defaultIcon;
 
+// Reset Leaflet's global ID counter - this is crucial
+if (typeof window !== 'undefined' && window.L) {
+  // @ts-ignore - Accessing Leaflet's internal property
+  window.L._leaflet_id = 0;
+}
+
 function MapResizer() {
     const map = useMap();
     
     useEffect(() => {
-      setTimeout(() => {
+      // Use a small delay to ensure the map container is fully rendered
+      const timer = setTimeout(() => {
         map.invalidateSize();
-      }, 100);
+      }, 250);
+      
+      return () => clearTimeout(timer);
     }, [map]);
   
     return null;
-  }
+}
+
 const MapComponent = ({ centerPoint, description, emergencies }: UnifiedMapProps) => {
-    return (
-        <MapContainer center={[centerPoint[1], centerPoint[0]]} zoom={13} style={{ height: '500px', width: '100%' }}>
-    <MapResizer />
-    <TileLayer
-    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-    />
+    // Use useMemo to prevent unnecessary re-renders
+    const mapCenter = useMemo(() => {
+      return [centerPoint[1], centerPoint[0]] as [number, number];
+    }, [centerPoint]);
     
+    // Generate a unique ID for this map instance
+    const mapId = useMemo(() => `map-${Math.random().toString(36).substring(2, 9)}`, []);
+    
+    // Use a ref to track if this component is mounted
+    const isMountedRef = useRef(false);
+    
+    // Reset Leaflet's ID counter on mount
+    useEffect(() => {
+      if (typeof window !== 'undefined' && window.L) {
+        // @ts-ignore - Accessing Leaflet's internal property
+        window.L._leaflet_id = 0;
+      }
+      
+      isMountedRef.current = true;
+      
+      return () => {
+        isMountedRef.current = false;
+        
+        // Clean up any Leaflet map instances on unmount
+        if (typeof window !== 'undefined') {
+          const mapContainers = document.querySelectorAll('.leaflet-container');
+          mapContainers.forEach(container => {
+            // @ts-ignore - Accessing Leaflet's internal property
+            if (container._leaflet_id) {
+              // @ts-ignore
+              container._leaflet = null;
+              // @ts-ignore
+              container._leaflet_id = null;
+            }
+          });
+        }
+      };
+    }, [centerPoint]); // Re-run when centerPoint changes
+    
+    // We should always render the map - removing this check that was preventing rendering
+    // The useEffect above sets isMountedRef.current = true, but this check was running before that effect
+    
+    return (
+        <MapContainer 
+          center={mapCenter} 
+          zoom={13} 
+          style={{ height: '500px', width: '100%' }}
+          id={mapId} // Add a unique ID to each map instance
+          key={`map-${centerPoint[0]}-${centerPoint[1]}-${Date.now()}`} // Ensure complete remounting
+          whenCreated={(mapInstance) => {
+            // Store reference to map instance for cleanup
+            return mapInstance;
+          }}
+        >
+          <MapResizer />
+          <TileLayer
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          />
+          
           {/* Work Order Location */}
-          <Marker position={[centerPoint[1], centerPoint[0]]}>
+          <Marker position={mapCenter}>
             <Popup>
               <strong>Work Order Location</strong>
               <br />
@@ -62,7 +125,7 @@ const MapComponent = ({ centerPoint, description, emergencies }: UnifiedMapProps
                 emergency.geometry.coordinates[1] as number,
                 emergency.geometry.coordinates[0] as number
               ];
-                      return (
+              return (
                 <Circle
                   key={emergency.properties.id}
                   center={coordinates}
@@ -102,7 +165,7 @@ const MapComponent = ({ centerPoint, description, emergencies }: UnifiedMapProps
                         });
                       
                         return (
-                          <Polygon key={index} positions={positions}>
+                          <Polygon key={`${emergency.properties.id}-${index}`} positions={positions}>
                             <Popup>
                               <strong>{emergency.properties.sourceTitle}</strong>
                               <br />
@@ -117,8 +180,6 @@ const MapComponent = ({ centerPoint, description, emergencies }: UnifiedMapProps
               
             return null;
           })}
-    
-    
         </MapContainer>
       );
     };
@@ -142,4 +203,3 @@ const getMarkerColor = (category: string): string => {
     };
     
 export default MapComponent;
-    
