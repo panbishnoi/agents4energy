@@ -21,6 +21,23 @@ import { amplifyClient, getMessageCatigory } from "@/utils/amplify-utils"; // En
 import { createChatSession } from "@/../amplify/functions/graphql/mutations";
 import ReactMarkdown from "react-markdown";
 
+// Define Message type explicitly here since we can't find the original definition
+interface Message {
+  id: string;
+  content: string;
+  role: string;
+  createdAt: string;
+  chatSessionId?: unknown;
+  tool_calls?: unknown;
+  responseComplete?: unknown;
+}
+
+// Define Chunk type for formatted responses
+interface Chunk {
+  index: number;
+  content: string;
+}
+
 const WorkOrderDetails = () => {
   const searchParams = useSearchParams(); 
   const router = useRouter();
@@ -241,14 +258,14 @@ const WorkOrderDetails = () => {
   const combineAndSortMessages = (arr1: Message[], arr2: Record<string, unknown>[]): Message[] => {
     // Convert arr2 items to ensure they match the Message interface
     const convertedArr2 = arr2.map(item => ({
-      id: item.id || '',
-      content: item.content || '',
-      role: item.role || '',
-      createdAt: item.createdAt || new Date().toISOString(),
+      id: String(item.id || ''),
+      content: String(item.content || ''),
+      role: String(item.role || ''),
+      createdAt: String(item.createdAt || new Date().toISOString()),
       chatSessionId: item.chatSessionId,
       tool_calls: item.tool_calls,
       responseComplete: item.responseComplete
-    }));
+    } as Message)); // Explicitly cast to Message type
     
     const combinedMessages = [...arr1, ...convertedArr2];
     const uniqueMessages = combinedMessages.filter((message, index, self) =>
