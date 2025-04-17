@@ -61,7 +61,6 @@ const UnifiedMap = (props: UnifiedMapProps) => {
       // Clean up any Leaflet map instances on unmount
       if (typeof window !== 'undefined') {
         // Reset Leaflet's internal counter
-        // @ts-expect-error - Accessing Leaflet's internal property
         if (window.L) {
           // @ts-expect-error - Accessing Leaflet's internal property
           window.L._leaflet_id = 0;
