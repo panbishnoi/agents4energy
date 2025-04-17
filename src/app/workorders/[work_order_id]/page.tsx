@@ -248,19 +248,25 @@ const WorkOrderDetails = () => {
   const combineAndSortMessages = (arr1: Message[], arr2: Record<string, unknown>[]): Message[] => {
     // Convert arr2 items to ensure they match the Message interface from utils/types
     const convertedArr2 = arr2.map(item => {
-      // Create a properly typed Message object
-      const message: Message = {
+      // Create a properly typed Message object that matches Schema["ChatMessage"]["createType"]
+      return {
         id: String(item.id || ''),
         content: String(item.content || ''),
-        role: (item.role as string === 'human' || item.role as string === 'ai' || item.role as string === 'tool') 
+        role: (item.role === 'human' || item.role === 'ai' || item.role === 'tool') 
           ? (item.role as "human" | "ai" | "tool") 
           : "ai", // Default to 'ai' if not a valid role
-        createdAt: String(item.createdAt || new Date().toISOString()),
-        chatSessionId: item.chatSessionId as string,
-        tool_calls: item.tool_calls as string,
-        responseComplete: item.responseComplete as boolean
-      };
-      return message;
+        createdAt: item.createdAt ? new Date(String(item.createdAt)).toISOString() : new Date().toISOString(),
+        chatSessionId: String(item.chatSessionId || ''),
+        tool_name: item.tool_name as string | undefined,
+        tool_call_id: item.tool_call_id as string | undefined,
+        tool_calls: item.tool_calls as string | undefined,
+        responseComplete: Boolean(item.responseComplete),
+        trace: item.trace as string | undefined,
+        owner: item.owner as string | undefined,
+        chainOfThought: Boolean(item.chainOfThought),
+        chatSessionIdDashFieldName: item.chatSessionIdDashFieldName as string | undefined,
+        userFeedback: item.userFeedback as "like" | "dislike" | "none" | undefined
+      } as Message;
     });
     
     const combinedMessages = [...arr1, ...convertedArr2];
@@ -290,39 +296,6 @@ const WorkOrderDetails = () => {
           
           // Log the messages for debugging
           console.log("Sorted messages:", sortedMessages);
-          
-          // Process the messages if needed
-          const sortedMessageWithPlotContext = sortedMessages.map((message, index) => {
-            try {
-              const messageCatigory = getMessageCatigory(message);
-              if (messageCatigory === 'tool_plot') {
-                // Get the messages with a lower index than the tool_plot's index
-                const earlierMessages = sortedMessages.slice(0, index).reverse();
-
-                const earlierEventsTable = earlierMessages.find((previousMessage) => {
-                  const previousMessageCatigory = getMessageCatigory(previousMessage);
-                  return previousMessageCatigory === 'tool_table_events';
-                });
-
-                const earlierTrendTable = earlierMessages.find((previousMessage) => {
-                  const previousMessageCatigory = getMessageCatigory(previousMessage);
-                  return previousMessageCatigory === 'tool_table_trend';
-                });
-
-                return {
-                  ...message,
-                  previousTrendTableMessage: earlierTrendTable,
-                  previousEventTableMessage: earlierEventsTable
-                };
-              } 
-              return message;
-            } catch (error) {
-              console.error("Error processing message:", error, message);
-              return message;
-            }
-          });
-          
-          console.log("Processed messages:", sortedMessageWithPlotContext);
         } catch (error) {
           console.error("Error in subscribeToChatUpdates:", error);
         }
@@ -468,26 +441,7 @@ const WorkOrderDetails = () => {
         throw new Error('Work order location details are incomplete.');
       }
       
-      // This would be where you'd call your emergency check API
-      // For now, we're just logging the coordinates
       console.log(`Checking emergencies at: ${latitude}, ${longitude}`);
-      
-      // Create a prompt that includes the location details
-      const emergencyPromptText = `Check for emergencies near latitude ${latitude}, longitude ${longitude}. 
-                    This is for work order ${workOrder.work_order_id} at ${workOrder.location_name}.
-                    Please provide information about any emergency situations within 50 miles of this location.`;
-      
-      // Create a new chat session
-      const emergencyChatSession = await amplifyClient.graphql({
-        query: createChatSession,
-        variables: { input: {} },
-      });
-      
-      const emergencyChatSessionId = emergencyChatSession.data.createChatSession.id;
-      if (!emergencyChatSessionId) throw new Error("Failed to create emergency chat session");
-      
-      // Subscribe to updates for this chat session
-      subscribeToEmergencyUpdates(emergencyChatSessionId);
       
       // Re-enable map rendering after the emergency check is complete
       // Only if the location section is expanded
@@ -497,21 +451,9 @@ const WorkOrderDetails = () => {
         }, 500);
       }
       
-      // Invoke Bedrock Agent with the emergency prompt
-      await amplifyClient.queries
-        .invokeBedrockAgent({
-          prompt: emergencyPromptText,
-          agentId: "OKXTFRR08S",
-          agentAliasId: "KZENI6GIPM",
-          chatSessionId: emergencyChatSessionId,
-        })
-        .then(() => {
-          console.log("Emergency check initiated successfully.");
-        })
-        .catch((error) => {
-          console.error("Error invoking Bedrock Agent:", error);
-          setError('Failed to initiate emergency check');
-        });
+      // TODO: Implement emergency check functionality later
+      setLoadingEmergencies(false);
+
     } catch (error) {
       console.error("Error checking emergencies:", error);
       setError('Failed to initiate emergency check');
